@@ -34,17 +34,28 @@ class Mooha:
             self.uid=soup.find('a',title='查看个人资料')\
                 .get('href').rpartition('id=')[2]
 
-    def repos(self):
+    def repos(self,cached=True):
+        def _cached_repos():
+            for x in soup.find_all('span','mooha-articleid-cache'):
+                yield x['title']
+
+        def _all_repos():
+            for x in soup.find_all('script')[-1].text.split('\n'):
+                if x.startswith('M.util.init_block_hider'):
+                    yield {
+                        'id':x.partition('id":"inst')[2].partition('"')[0],
+                        'title':ast.literal_eval(
+                            '"%s"'%x.partition('title":"')[2].partition('"')[0]
+                        ),
+                    }
+        
         res=self.s.get(self.base+'/my/index.php')
         soup=BeautifulSoup(res.text,self.parser)
-        for x in soup.find_all('script')[-1].text.split('\n'):
-            if x.startswith('M.util.init_block_hider'):
-                yield {
-                    'id':x.partition('id":"inst')[2].partition('"')[0],
-                    'title':ast.literal_eval(
-                        '"%s"'%x.partition('title":"')[2].partition('"')[0]
-                    ),
-                }
+        if cached:
+            cache=list(_cached_repos())
+            yield from filter(lambda x:x['id'] in cache,_all_repos())
+        else:
+            yield from _all_repos()
 
     def _unlock(self):
         res=self.s.post(
@@ -71,8 +82,17 @@ class Mooha:
         except RuntimeError:
             self._unlock()
             return get()
-        
-    def _save(self,articleid,itemid,extra={},text='Mooha by @xmcp'):
+
+    def _render_html(self,articleid,filelist):
+        def sub():
+            yield '<b><span class="mooha-articleid-cache" title="%s">%d 个文件</span></b><br>'\
+                  %(articleid,len(filelist))
+            for name,size,url in filelist:
+                yield '<li><a href=javascript:window.open("%s")><b>%s</b> (%s)</a></li>'\
+                    %(url,name,size)
+        return ''.join(sub())
+    
+    def _save(self,articleid,itemid,extra={},text=None):
         default={
             'bui_editid':articleid,
             'bui_editingatfrontpage':'0',
@@ -84,7 +104,7 @@ class Mooha:
             'mform_isexpanded_id_configheader':'1',
             'mform_isexpanded_id_whereheader':'0',
             'mform_isexpanded_id_onthispage':'0',
-            'config_text[text]':text,
+            'config_text[text]':text or self._render_html(articleid,[]),
             'config_text[format]':'1',
             'config_text[itemid]':itemid,
             'bui_visible':'1',
@@ -198,13 +218,8 @@ class Mooha:
         self._save(articleid,self._itemid(articleid),{'config_title':name})
     
     def inject_html(self,articleid):
-        def render(filelist):
-            for name,size,url in filelist:
-                yield '<li><a href=javascript:window.open("%s")><b>%s</b> (%s)</a></li>'\
-                    %(url,name,size)
-    
         filelist=[(f['filename'],f['filesize'],f['url']) for f in self.files(articleid)['list']]
-        self._save(articleid,self._itemid(articleid),text=''.join(render(filelist)))
+        self._save(articleid,self._itemid(articleid),text=self._render_html(articleid,filelist))
 
 if __name__=='__main__':
     a=Mooha()

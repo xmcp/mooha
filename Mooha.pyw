@@ -162,11 +162,21 @@ def refresh(*_):
     filedetail.clear()
     inarticle.clear()
     tk.update()
+
     try:
         repos=list(moo.repos())
     except Exception as e:
         msg.set('[仓库列表获取失败] %r'%e)
         raise
+
+    if not repos:
+        if messagebox.askyesno(
+                'Mooha',
+                '您的账户中没有检测到任何可用的仓库。\n\n'
+                '第一次使用 Mooha 的新用户请点击右下角的“新仓库”；\n'
+                '从旧版 Mooha 升级的老用户需要重建 ArticleID 缓存。\n\n'
+                '现在重建缓存吗？'):
+            return fixit(sure=True)
     for ind,repo in enumerate(repos):
         try:
             msg.set('正在获取文件列表 (%d/%d)...'%(ind+1,len(repos)))
@@ -268,7 +278,7 @@ def down_callback(*_):
 
 def delete():
     def delete_single():
-        if messagebox.askyesno('删除文件','确定删除 %s 吗？'%filedetail[item]['filename']):
+        if messagebox.askokcancel('删除文件','确定删除 %s 吗？'%filedetail[item]['filename']):
             msg.set('正在删除 %s...'%filedetail[item]['filename'])
             tk.update()
             try:
@@ -281,7 +291,7 @@ def delete():
                 refresh()
                 
     def delete_group():
-        if messagebox.askyesno('删除仓库','确定仓库 %s 和其中的所有文件吗？'%(tree.item(item)['text'])):
+        if messagebox.askokcancel('删除仓库','确定仓库 %s 和其中的所有文件吗？'%(tree.item(item)['text'])):
             msg.set('正在删除 %s...'%(tree.item(item)['text']))
             tk.update()       
             try:
@@ -379,6 +389,22 @@ def newrepo():
         else:
             refresh()
 
+def fixit(*_,sure=False):
+    if sure or messagebox.askokcancel('Mooha','重建 ArticleID 缓存？'):
+        msg.set('正在重建缓存...')
+        tk.update()
+        repos=list(moo.repos(cached=False))
+        for ind,repo in enumerate(repos):
+            msg.set('正在重建缓存 (%d/%d)...'%(ind+1,len(repos)))
+            tk.update()
+            try:
+                moo.files(repo['id'])
+            except mooha.NoAttachment:
+                pass
+            else:
+                moo.inject_html(repo['id'])
+        refresh()
+
 authf=Frame(tk)
 authf.grid(row=0,column=0,sticky='we')
 authf.columnconfigure(4,weight=1)
@@ -430,5 +456,5 @@ for ind,btn in enumerate(action_btns):
 
 Label(tk,textvariable=msg).grid(row=3,column=0,sticky='we')
 
-tree.bind('<Triple-Button-3>',lambda *_:messagebox.showinfo('Mooha','made by @xmcp'))
+tree.bind('<Triple-Button-3>',fixit)
 mainloop()
