@@ -35,10 +35,6 @@ class Mooha:
                 .get('href').rpartition('id=')[2]
 
     def repos(self,cached=True):
-        def _cached_repos():
-            for x in soup.find_all('span','mooha-articleid-cache'):
-                yield x['title']
-
         def _all_repos():
             for x in soup.find_all('script')[-1].text.split('\n'):
                 if x.startswith('M.util.init_block_hider'):
@@ -52,13 +48,13 @@ class Mooha:
         res=self.s.get(self.base+'/my/index.php')
         soup=BeautifulSoup(res.text,self.parser)
         if cached:
-            cache=list(_cached_repos())
+            cache=[x['title'] for x in soup.find_all('span','mooha-articleid-cache')]
             yield from filter(lambda x:x['id'] in cache,_all_repos())
         else:
             yield from _all_repos()
 
     def _unlock(self):
-        res=self.s.post(
+        self.s.post(
             self.base+'/my/index.php',
             data={'edit':'1','sesskey':self.sesskey},
         )
@@ -146,11 +142,12 @@ class Mooha:
             },
             callback=callback,
         )
-        self.s.post(
+        res=self.s.post(
             self.base+'/repository/repository_ajax.php?action=upload',
             data=monitor,
             headers={'Content-Type':monitor.content_type},
         )
+        assert 'error' not in res.json(), res.json()['error']
         self._save(articleid,itemid)
 
     def download(self,url,chunk_size=10000):
@@ -202,13 +199,13 @@ class Mooha:
         assert res.status_code==303, '删除仓库失败'
     
     def repo_create(self,name):
+        self._unlock()
         res=self.s.post(
             self.base+'/my/index.php',
             params={'sesskey':self.sesskey,'bui_addblock':'html'},
             allow_redirects=False,
         )
         assert res.status_code==303, '创建仓库失败'
-        self._unlock()
         
         res=self.s.get(self.base+'/my/index.php')
         soup=BeautifulSoup(res.text,self.parser)

@@ -72,9 +72,6 @@ class ProgressDialog:
         f=Frame(self.tl)
         f.grid(row=self.total,column=0,sticky='we')
         f.columnconfigure(1,weight=1)
-        
-        if self.total>1:
-            Separator(f,orient=HORIZONTAL).grid(row=0,column=5,sticky='we')        
 
         self.size[name]=size
         self.allsize+=size
@@ -82,12 +79,12 @@ class ProgressDialog:
         self.progress[name]=StringVar(value='等待中')
 
         Label(f,text=os.path.basename(name),font=font.Font(weight=font.BOLD))\
-            .grid(row=1,column=0)
-        Label(f,text='  ').grid(row=1,column=1)
+            .grid(row=0,column=0)
+        Label(f,text='  ').grid(row=0,column=1)
 
-        Label(f,textvariable=self.downloaded[name]).grid(row=1,column=2)
-        Label(f,text=' / %s'%self._proc(size)).grid(row=1,column=3,sticky='we')
-        Label(f,textvariable=self.progress[name],foreground='#0000ff',width=7).grid(row=1,column=4,sticky='e')
+        Label(f,textvariable=self.downloaded[name]).grid(row=0,column=2)
+        Label(f,text=' / %s'%self._proc(size)).grid(row=0,column=3,sticky='we')
+        Label(f,textvariable=self.progress[name],foreground='#0000ff',width=7).grid(row=0,column=4,sticky='e')
 
     def start(self,name):
         self.current=name
@@ -266,13 +263,16 @@ def down_callback(*_):
             threading.Thread(
                 target=real_download,
                 args=[dn],
-                ).start()    
+            ).start()    
     
     item=tree.focus()
     if item in filedetail:
         download_single()
     elif item in inarticle:
-        download_group(children[item])
+        if children[item]:
+            download_group(children[item])
+        else:
+            msg.set('仓库为空')
     else:
         msg.set('文件不存在')
 
@@ -377,7 +377,7 @@ def upload():
         msg.set('没有选择仓库')
 
 def newrepo():
-    name=simpledialog.askstring('仓库名','要创建的仓库的名称：')
+    name=simpledialog.askstring('仓库名','要创建的仓库名称：')
     if name:
         msg.set('正在创建仓库...')
         tk.update()            
