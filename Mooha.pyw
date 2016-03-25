@@ -358,7 +358,12 @@ def upload():
         for fn in fns:
             with open(fn,'rb') as f:
                 window.start(fn)
-                moo.upload(inarticle[item],os.path.basename(fn),f,callback)
+                try:
+                    moo.upload(inarticle[item],os.path.basename(fn),f,callback)
+                except Exception as e:
+                    msg.set('[上传失败] %r'%e)
+                    window.destroy()
+                    raise
                 window.complete()
 
         moo.inject_html(inarticle[item])
