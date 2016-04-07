@@ -25,11 +25,17 @@ class ConsoleUI:
         goto(2,0)
         print(title)
         goto(4,0)
-        for name,description in items:
-            print('  %s (%s)'%(name,description))
-        self.select(self.selected_loc)
+        if items:
+            for name,description in items:
+                print('  %s (%s)'%(name,description))
+            self.select(self.selected_loc)
+        else:
+            print('(Empty)')
+        goto(0,self.prompt_loc+len(self.search_str))
 
     def select(self,ind):
+        if not self.names:
+            return
         ind=ind%len(self.names)
         goto(4+self.selected_loc,0)
         print(' ')
@@ -43,8 +49,7 @@ class ConsoleUI:
                 goto(0,self.prompt_loc+len(self.search_str))
                 self.select(ind)
                 return True
-        else:
-            #todo: beep
+        else: #todo: beep
             return False
 
     def insert(self,char):
@@ -58,7 +63,6 @@ class ConsoleUI:
     def cancel(self):
         cll(0,self.prompt_loc)
         self.search_str=''
-        self.select(0)
 
     def backspace(self):
         if self.search_str:
@@ -70,7 +74,9 @@ class ConsoleUI:
     def handle(self,hotkeys):
         while True:
             ch=getch()
-            if ch in hotkeys:
+            if self.search_str and ch==b'\x1b': #esc
+                self.cancel()
+            elif ch in hotkeys:
                 return (ch,self.selected_loc)
             elif ch==b'\xe0' and kbhit(): #cursor
                 ch_=getch()
@@ -78,8 +84,10 @@ class ConsoleUI:
                     self.select(self.selected_loc-1)
                 elif ch_==b'P': #down
                     self.select(self.selected_loc+1)
-            elif ch==b'\x1b': #esc
-                self.cancel()
+                elif ch_==b'K': #left
+                    self.select(0)
+                elif ch_==b'M': #right
+                    self.select(-1)
             elif ch==b'\x08': #backspace
                 self.backspace()
             else: #search
@@ -113,20 +121,32 @@ if __name__=='__main__':
     print('Fetching repos...')
     repos=list(moo.repos())
 
-    ui_repos=ConsoleUI('>','[%s] %d repos'%(un,len(repos)),genitems(repos),0)
-
+    ui_repos=ConsoleUI('>','[%s] %d repos (Press Tab to Create)'%(un,len(repos)),genitems(repos),0)
     while True:
         ui_repos.redraw()
-        key,ind=ui_repos.handle([b'\r']) #todo: add quit key
+        key,ind=ui_repos.handle([b'\r',b'\t']) #todo: add quit key
+        
         if key==b'\r': #go into repo
             cll(2,0)
             goto(2,0)
             print('Fetching files...')
-            repo_title,repo_id=repos[ind]
+            repo_title,repo_id=repos[ind]['title'],repos[ind]['id']
             files=moo.files(repo_id)['list']
-            ui_sub=ConsoleUI('<[Tab]','[%s] %d files'%(repo_title,len(files)),genfiles(files),0)
-            ui_sub.redraw()
-            ui_sub.handle()
-    
+            
+            ui_sub=ConsoleUI('<[Esc]','[%s] %d files (Press Tab to Upload)'%(repo_title,len(files)),genfiles(files),0)
+            while True:
+                ui_sub.redraw()
+                key,ind=ui_sub.handle([b'\x1b',b'\t',b'\r'])
+                
+                if key==b'\x1b': #quit
+                    break
+                
+                elif key==b'\t': #upload
+                    pass
+                
+                elif key==b'\r': #file info
+                    pass
 
+        elif key==b'\t': #create repo
+            pass
     
