@@ -7,15 +7,32 @@ moo=Mooha()
 un=None
 
 class ConsoleUI:
-    def __init__(self,prompt,title,items,selected):
+    def __init__(self,prompt,title,items):
         items=list(items)
-        self._redraw_arg=(prompt,title,items)
+        self._redraw_arg=[prompt,None,None]
         
         self.prompt_loc=len(prompt)+1
+        self.update_items(title,items)
+
+    def holder(self,ind):
+        return '-' if self.available[ind] else ' '
+
+    def update_items(self,title,items):
+        items=list(items)
+        self._redraw_arg[1]=title
+        self._redraw_arg[2]=items
         self.names=[x[0] for x in items]
-        self.selected_loc=selected
+        self.selected_loc=0
+        self.available={x:True for x in range(len(items))}
         self.search_str=''
-        
+
+    def update_available(self,new):
+        old=self.available.copy()
+        self.available=new
+        for ind in range(len(self.names)):
+            if old[ind]!=new[ind]:
+                goto(4+ind,0)
+                print(self.holder(ind))
 
     def redraw(self):
         prompt,title,items=self._redraw_arg
@@ -26,8 +43,8 @@ class ConsoleUI:
         print(title)
         goto(4,0)
         if items:
-            for name,description in items:
-                print('  %s (%s)'%(name,description))
+            for ind,(name,description) in enumerate(items):
+                print('%s %s (%s)'%(self.holder(ind),name,description))
             self.select(self.selected_loc)
         else:
             print('(Empty)')
@@ -38,18 +55,24 @@ class ConsoleUI:
             return
         ind=ind%len(self.names)
         goto(4+self.selected_loc,0)
-        print(' ')
+        print(self.holder(self.selected_loc))
         goto(4+ind,0)
         print('*')
         self.selected_loc=ind
 
     def _search(self):
-        for ind,name in enumerate(self.names):
-            if name.lower().startswith(self.search_str.lower()):
-                goto(0,self.prompt_loc+len(self.search_str))
-                self.select(ind)
-                return True
-        else: #todo: beep
+        available={
+            ind:(self.names[ind].lower().startswith(self.search_str.lower()))
+            for ind in range(len(self.names))
+        }
+        if any(available.values()):
+            self.update_available(available)
+            for ind,okay in available.items():
+                if okay:
+                    self.select(ind)
+                    break
+            return True
+        else:
             return False
 
     def insert(self,char):
@@ -63,6 +86,7 @@ class ConsoleUI:
     def cancel(self):
         cll(0,self.prompt_loc)
         self.search_str=''
+        self.update_available({x:True for x in range(len(self.items))})
 
     def backspace(self):
         if self.search_str:
@@ -95,6 +119,9 @@ class ConsoleUI:
             goto(0,self.prompt_loc+len(self.search_str))
 
 def login():
+    moo.login('2011011108','1234567890')
+    return True
+    #todo: delete these
     global un
     un=input('Username: ')
     pw=getpass('Password: ')
@@ -121,19 +148,22 @@ if __name__=='__main__':
     print('Fetching repos...')
     repos=list(moo.repos())
 
-    ui_repos=ConsoleUI('>','[%s] %d repos (Press Tab to Create)'%(un,len(repos)),genitems(repos),0)
+    ui_repos=ConsoleUI('>','[%s] %d repos (Press Tab to Create)'%(un,len(repos)),genitems(repos))
     while True:
         ui_repos.redraw()
-        key,ind=ui_repos.handle([b'\r',b'\t']) #todo: add quit key
+        key,ind=ui_repos.handle([b'\r',b'\t',b'\x1b'])
+
+        if key==b'\x1b': #quit
+            break
         
-        if key==b'\r': #go into repo
+        elif key==b'\r': #go into repo
             cll(2,0)
             goto(2,0)
             print('Fetching files...')
             repo_title,repo_id=repos[ind]['title'],repos[ind]['id']
             files=moo.files(repo_id)['list']
             
-            ui_sub=ConsoleUI('<[Esc]','[%s] %d files (Press Tab to Upload)'%(repo_title,len(files)),genfiles(files),0)
+            ui_sub=ConsoleUI('<[Esc]','[%s] %d files (Press Tab to Upload)'%(repo_title,len(files)),genfiles(files))
             while True:
                 ui_sub.redraw()
                 key,ind=ui_sub.handle([b'\x1b',b'\t',b'\r'])
@@ -148,5 +178,10 @@ if __name__=='__main__':
                     pass
 
         elif key==b'\t': #create repo
-            pass
-    
+            cll(2,0)
+            goto(2,0)
+            repo_name=input('Create repository: ')
+            if repo_name:
+                moo.repo_create(repo_name)
+                repos=list(moo.repos())
+                ui_repos.update_items('[%s] %d repos (Press Tab to Create)'%(un,len(repos)),genitems(repos))
