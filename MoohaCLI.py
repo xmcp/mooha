@@ -4,6 +4,7 @@ from getpass import getpass
 from libconsole import cls, goto, cll
 from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
 from colorama import *
+import sys
 import os
 import math
 
@@ -168,14 +169,16 @@ class ProgressUI:
             goto(4+ind,0)
             total_size+=size
             self.subbar.append(ProgressBar(
-                widgets=[name.ljust(fnlen+1,' '),Percentage(),' ',Bar(marker='#'),dispsize.rjust(szlen+1)],
-                maxval=size
+                widgets=[Fore.YELLOW+Style.BRIGHT+name.ljust(fnlen+1,' ')+Style.RESET_ALL,' ',Bar(marker='#'),dispsize.rjust(szlen+1)],
+                maxval=size,
+                fd=sys.stdout,
             ).start())
 
         goto(2,0)
         self.mainbar=ProgressBar(
-            widgets=[Percentage(),' ',Bar(marker='>'),' ',ETA(), ' ',FileTransferSpeed()],
-            maxval=total_size
+            widgets=[Fore.YELLOW+Style.BRIGHT,Percentage(),Style.RESET_ALL,' ',Bar(marker='>'),' ',Style.BRIGHT,ETA(),Style.NORMAL,' ',FileTransferSpeed()],
+            maxval=total_size,
+            fd=sys.stdout,
         ).start()
 
     def update(self,delta):
