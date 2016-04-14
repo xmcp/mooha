@@ -2,9 +2,28 @@ from msvcrt import getch, kbhit
 from moohalib import Mooha, NoAttachment
 from getpass import getpass
 from libconsole import cls, goto, cll
+from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
+import os
+import math
 
 moo=Mooha()
 un=None
+CHUNKSIZE=100000
+
+for d in ['~/downloads','~/desktop','~/桌面']:
+    if os.path.isdir(os.path.expanduser(d)):
+        homedir=os.path.expanduser(d)
+        break
+else:
+    homedir='/'
+
+def friendly_size(b): # copied from progressbar/widgets.py
+    FORMAT = '%6.2f%sB'
+    PREFIXES = ' kMGTPEZY'
+    
+    power = int(math.log(b, 1000))
+    scaled = b / 1000.**power
+    return FORMAT % (scaled, PREFIXES[power])
 
 class ConsoleUI:
     def __init__(self,prompt,title,items):
@@ -37,7 +56,7 @@ class ConsoleUI:
         prompt,title,items=self._redraw_arg
         cls()
         goto(0,0)
-        print(prompt)
+        print('%s %s'%(prompt,self.search_str))
         goto(2,1)
         print(title)
         goto(4,0)
@@ -117,6 +136,56 @@ class ConsoleUI:
                 self.insert(ch.decode(errors='replace'))
             goto(0,self.prompt_loc+len(self.search_str))
 
+class ProgressUI:
+    def __init__(self,kind,items):
+        cls()
+        goto(0,0)
+        print(' * %s Files...'%kind)
+        
+        total_size=0
+        self.subbar=[]
+        self.cur_ind=0
+        self.cur_transfered=0
+        self.total_transfered=0
+
+        fnlen=max([len(item[0]) for item in items])
+        szlen=max([len(item[2]) for item in items])
+        for ind,(name,size,dispsize) in enumerate(items):
+            goto(4+ind,0)
+            total_size+=size
+            self.subbar.append(ProgressBar(
+                widgets=[name.ljust(fnlen+1,' '),Percentage(),' ',Bar(marker='#'),dispsize.rjust(szlen+1)],
+                maxval=size
+            ).start())
+
+        goto(2,0)
+        self.mainbar=ProgressBar(
+            widgets=[Percentage(),' ',Bar(marker='>'),' ',ETA(), ' ',FileTransferSpeed()],
+            maxval=total_size
+        ).start()
+
+    def update(self,delta):
+        self.cur_transfered+=delta
+        self.total_transfered+=delta
+        self.cur_transfered=min(self.cur_transfered,self.subbar[self.cur_ind].maxval)
+        self.total_transfered=min(self.total_transfered,self.mainbar.maxval)
+        
+        goto(2,0)
+        self.mainbar.update(self.total_transfered)
+        goto(4+self.cur_ind,0)
+        self.subbar[self.cur_ind].update(self.cur_transfered)
+
+    def complete(self):
+        self.total_transfered+=self.subbar[self.cur_ind].maxval-self.cur_transfered
+
+        goto(2,0)
+        self.mainbar.update(self.total_transfered)
+        goto(4+self.cur_ind,0)
+        self.subbar[self.cur_ind].finish()
+
+        self.cur_ind+=1
+        self.cur_transfered=0
+        
 def login():
     moo.login('2011011108','1234567890')
     return True
@@ -131,6 +200,43 @@ def login():
         return False
     else:
         return True
+
+def download(files,destination):
+    ui=ProgressUI('Download',[(file['filename'],file['size'],file['filesize']) for file in files])
+    for file in files:
+        with open(os.path.join(destination,file['filename']),'wb') as f:
+            for chunk in moo.download(file['url'],CHUNKSIZE):
+                f.write(chunk)
+                ui.update(len(chunk))
+        ui.complete()
+
+def reuse_download_repo(repo_title,files):
+    prefered_path=os.path.join(homedir,repo_title)
+    if os.path.isfile(prefered_path):
+        prefered_path=homedir
+    elif not os.path.exists(prefered_path):
+            os.mkdir(prefered_path)
+    
+    download(files,prefered_path)
+    os.startfile(prefered_path)
+
+def upload(fns,destination):
+    def getstat():
+        for fn in fns:
+            _sz=os.path.getsize(fn)
+            yield [os.path.basename(fn),_sz,friendly_size(_sz)]
+
+    def callback(encoder):
+        nonlocal transfered
+        ui.update(encoder.bytes_read-transfered)
+        transfered=encoder.bytes_read
+    
+    ui=ProgressUI('Upload',list(getstat()))
+    for fn in fns:
+        with open(fn,'rb') as f:
+            transfered=0
+            moo.upload(destination,os.path.basename(fn),f,callback)
+            ui.complete()
 
 def genitems(repos):
     for x in repos:
@@ -201,16 +307,26 @@ while True:
                         refresh_sub()
 
                 elif key=='n': #upload
-                    pass
+                    cll(2,0)
+                    goto(2,0)
+                    fn=input(' Filename or Directory: ')
+                    if fn:
+                        if os.path.isfile(fn):
+                            upload([fn],repo_id)
+                        elif os.path.isdir(fn):
+                            upload([os.path.join(fn,f) for f in os.listdir(fn) if os.path.isfile(os.path.join(fn,f))],repo_id)
+                        refresh_sub()
 
-                elif key=='\n': #download repo
-                    pass
+                elif key=='\r': #download repo
+                    reuse_download_repo(repo_title,files)
             
             elif key==b'\r': #download
-                pass
+                download([files[ind]],homedir)
+                os.startfile(homedir)
 
             elif key==b' ': #download and open
-                pass
+                download([files[ind]],homedir)
+                os.startfile(os.path.join(homedir,files[ind]['filename']))
 
     elif key==b'\t': #repo options
         cll(2,0)
@@ -234,8 +350,11 @@ while True:
                 moo.repo_delete(repos[ind]['id'])
                 refresh_main()
 
-        elif key=='\n': #download repo
-            pass
+        elif key=='\r': #download repo
+            cll(2,0)
+            goto(2,0)
+            print(' Fetching files...')
+            reuse_download_repo(repos[ind]['title'],moo.files(repos[ind]['id'])['list'])
 
         elif key=='n': #create
             cll(2,0)
