@@ -34,9 +34,10 @@ def input(txt=''):
     deinit()
     init(autoreset=False)
     print(Style.BRIGHT+Fore.CYAN+txt+Fore.RESET,end='')
-    original_input()
+    res=original_input()
     deinit()
     init(autoreset=True)
+    return res
 
 class ConsoleUI:
     def __init__(self,prompt,title,items):
@@ -172,13 +173,15 @@ class ProgressUI:
                 widgets=[Fore.YELLOW+Style.BRIGHT+name.ljust(fnlen+1,' ')+Style.RESET_ALL,' ',Bar(marker='#'),dispsize.rjust(szlen+1)],
                 maxval=size,
                 fd=sys.stdout,
+                delta=14,
             ).start())
 
         goto(2,0)
         self.mainbar=ProgressBar(
-            widgets=[Fore.YELLOW+Style.BRIGHT,Percentage(),Style.RESET_ALL,' ',Bar(marker='>'),' ',Style.BRIGHT,ETA(),Style.NORMAL,' ',FileTransferSpeed()],
+            widgets=[Fore.WHITE+Style.BRIGHT,Percentage(),Style.RESET_ALL,' ',Bar(marker='>'),' ',Style.BRIGHT,ETA(),Style.NORMAL,' ',FileTransferSpeed()],
             maxval=total_size,
             fd=sys.stdout,
+            delta=23,
         ).start()
 
     def update(self,delta):
@@ -204,16 +207,13 @@ class ProgressUI:
         self.cur_transfered=0
         
 def login():
-    moo.login('2011011108','1234567890')
-    return True
-    #todo: delete these
     global un
     un=input('Username: ')
     pw=getpass('Password: ')
     try:
         moo.login(un,pw)
     except Exception as e:
-        print('[Error] %s'%e)
+        print('[Error] %s %s'%(type(e),e))
         return False
     else:
         return True

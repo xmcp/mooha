@@ -88,14 +88,14 @@ class ProgressBar(object):
                  'left_justify', 'maxval', 'next_update', 'num_intervals',
                  'poll', 'seconds_elapsed', 'signal_set', 'start_time',
                  'term_width', 'update_interval', 'widgets', '_time_sensitive',
-                 '__iterable')
+                 '__iterable', 'delta')
 
     _DEFAULT_MAXVAL = 100
     _DEFAULT_TERMSIZE = 80
     _DEFAULT_WIDGETS = [widgets.Percentage(), ' ', widgets.Bar()]
 
     def __init__(self, maxval=None, widgets=None, term_width=None, poll=1,
-                 left_justify=True, fd=sys.stderr):
+                 left_justify=True, fd=sys.stderr, delta=0):
         """Initializes a progress bar with sane defaults."""
 
         # Don't share a reference with any other progress bars
@@ -106,6 +106,7 @@ class ProgressBar(object):
         self.widgets = widgets
         self.fd = fd
         self.left_justify = left_justify
+        self.delta=delta
 
         self.signal_set = False
         if term_width is not None:
@@ -193,7 +194,7 @@ class ProgressBar(object):
     def _format_widgets(self):
         result = []
         expanding = []
-        width = self.term_width
+        width = self.term_width+self.delta
 
         for index, widget in enumerate(self.widgets):
             if isinstance(widget, widgets.WidgetHFill):

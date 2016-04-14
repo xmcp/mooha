@@ -7,6 +7,10 @@ if sys.platform == 'win32':
 executables = [Executable(script='Mooha.pyw',
                base=base,
                targetName="Mooha.exe",
+               compress=True),
+               Executable(script='MoohaCLI.py',
+               base=None,
+               targetName="[CLI]Mooha.exe",
                compress=True)]
 setup(name='Mooha',
       version='1.0',
