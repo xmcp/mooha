@@ -3,8 +3,11 @@ from moohalib import Mooha, NoAttachment
 from getpass import getpass
 from libconsole import cls, goto, cll
 from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
+from colorama import *
 import os
 import math
+
+init(autoreset=True) #colorama
 
 moo=Mooha()
 un=None
@@ -25,6 +28,15 @@ def friendly_size(b): # copied from progressbar/widgets.py
     scaled = b / 1000.**power
     return FORMAT % (scaled, PREFIXES[power])
 
+original_input=input
+def input(txt=''):
+    deinit()
+    init(autoreset=False)
+    print(Style.BRIGHT+Fore.CYAN+txt+Fore.RESET,end='')
+    original_input()
+    deinit()
+    init(autoreset=True)
+
 class ConsoleUI:
     def __init__(self,prompt,title,items):
         items=list(items)
@@ -34,7 +46,7 @@ class ConsoleUI:
         self.update_items(items)
 
     def holder(self,ind):
-        return '-' if self.available[ind] else ' '
+        return Back.GREEN+'-' if self.available[ind] else ' '
 
     def update_items(self,items):
         items=list(items)
@@ -56,13 +68,15 @@ class ConsoleUI:
         prompt,title,items=self._redraw_arg
         cls()
         goto(0,0)
-        print('%s %s'%(prompt,self.search_str))
+        print(Fore.CYAN+Style.BRIGHT+'%s %s'%(prompt,Fore.WHITE+self.search_str))
         goto(2,1)
         print(title)
         goto(4,0)
         if items:
             for ind,(name,description) in enumerate(items):
-                print('%s %s (%s)'%(self.holder(ind),name,description))
+                print(self.holder(ind),end=' ')
+                print(Fore.YELLOW+Style.BRIGHT+name,end=' ')
+                print(Fore.WHITE+'(%s)'%description)
             self.select(self.selected_loc)
         else:
             print('(Empty)')
@@ -75,7 +89,7 @@ class ConsoleUI:
         goto(4+self.selected_loc,0)
         print(self.holder(self.selected_loc))
         goto(4+ind,0)
-        print('*')
+        print(Fore.GREEN+Back.GREEN+Style.BRIGHT+'*')
         self.selected_loc=ind
 
     def _search(self):
@@ -97,7 +111,7 @@ class ConsoleUI:
         self.search_str+=char
         if self._search():
             goto(0,self.prompt_loc+len(self.search_str)-1)
-            print(char)
+            print(Style.BRIGHT+char)
         else:
             self.search_str=self.search_str[:-1]
 
@@ -140,7 +154,7 @@ class ProgressUI:
     def __init__(self,kind,items):
         cls()
         goto(0,0)
-        print(' * %s Files...'%kind)
+        print(Fore.CYAN+Style.BRIGHT+' * %s Files...'%kind)
         
         total_size=0
         self.subbar=[]
@@ -238,6 +252,16 @@ def upload(fns,destination):
             moo.upload(destination,os.path.basename(fn),f,callback)
             ui.complete()
 
+def reuse_upload(repo_id):
+    cll(2,0)
+    goto(2,0)
+    fn=input(' Filename or Directory: ')
+    if fn:
+        if os.path.isfile(fn):
+            upload([fn],repo_id)
+        elif os.path.isdir(fn):
+            upload([os.path.join(fn,f) for f in os.listdir(fn) if os.path.isfile(os.path.join(fn,f))],repo_id)
+
 def genitems(repos):
     for x in repos:
         yield (x['title'],x['id'])
@@ -254,6 +278,9 @@ def refresh_sub():
     files=moo.files(repo_id)['list']
     ui_sub.update_items(genfiles(files))
 
+def wp(key,txt): #wrap text
+    return Back.RED+Style.BRIGHT+'['+key+']'+Style.RESET_ALL+Style.BRIGHT+' '+txt+' '
+
 print('Mooha CLI\n')
 while True:
     if login():
@@ -261,7 +288,10 @@ while True:
 print('Fetching repos...')
 repos=list(moo.repos())
 
-ui_repos=ConsoleUI('>','[Enter] List Files [Space] Upload [Tab] Options...',genitems(repos))
+ui_repos=ConsoleUI('>',
+    wp('Enter','List Files')+wp('Space','Upload')+wp('Tab','Options...'),
+    genitems(repos)
+)
 while True:
     ui_repos.redraw()
     key,ind=ui_repos.handle([b'\r',b'\t',b'\x1b',b' '])
@@ -276,7 +306,10 @@ while True:
         repo_title,repo_id=repos[ind]['title'],repos[ind]['id']
         files=moo.files(repo_id)['list']
         
-        ui_sub=ConsoleUI('%s >'%repo_title,'[Enter] Download & Open [Space] Download [Tab] Options...',genfiles(files))
+        ui_sub=ConsoleUI('%s >'%repo_title,
+            wp('Enter','Download & Open')+wp('Space','Download')+wp('Tab','Options...'),
+            genfiles(files)
+        )
         while True:
             ui_sub.redraw()
             key,ind=ui_sub.handle([b'\x1b',b'\t',b'\r',b' '])
@@ -287,7 +320,7 @@ while True:
             elif key==b'\t': #file options
                 cll(2,0)
                 goto(2,0)
-                print(' < [Space] Rename [X] Delete | [N] Upload [Enter] Download Repo')
+                print(' < '+wp('Space','Rename')+wp('X','Delete')+Style.RESET_ALL+'| '+wp('N','Upload')+wp('Enter','Download Repo'))
                 key=getch().decode(errors='replace').lower()
 
                 if key==' ': #rename
@@ -307,31 +340,24 @@ while True:
                         refresh_sub()
 
                 elif key=='n': #upload
-                    cll(2,0)
-                    goto(2,0)
-                    fn=input(' Filename or Directory: ')
-                    if fn:
-                        if os.path.isfile(fn):
-                            upload([fn],repo_id)
-                        elif os.path.isdir(fn):
-                            upload([os.path.join(fn,f) for f in os.listdir(fn) if os.path.isfile(os.path.join(fn,f))],repo_id)
-                        refresh_sub()
+                    reuse_upload(repo_id)
+                    refresh_sub()
 
                 elif key=='\r': #download repo
                     reuse_download_repo(repo_title,files)
             
-            elif key==b'\r': #download
+            elif key==b' ': #download
                 download([files[ind]],homedir)
                 os.startfile(homedir)
 
-            elif key==b' ': #download and open
+            elif key==b'\r': #download and open
                 download([files[ind]],homedir)
                 os.startfile(os.path.join(homedir,files[ind]['filename']))
 
     elif key==b'\t': #repo options
         cll(2,0)
         goto(2,0)
-        print(' < [Space] Rename [Enter] Download Repo [X] Delete | [N] Create Repo')
+        print(' < '+wp('Space','Rename')+wp('Enter','Download Repo')+wp('X','Delete')+Style.RESET_ALL+'| '+wp('N','Create Repo'))
         key=getch().decode(errors='replace').lower()
 
         if key==' ': #rename
@@ -379,7 +405,7 @@ while True:
             refresh_main()
 
     elif key==b' ': #upload
-        pass
+        reuse_upload(repos[ind]['id'])
 
 #normal quit
 cls()
