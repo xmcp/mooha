@@ -209,7 +209,8 @@ class ProgressUI:
 def login():
     global un
     un=input('Username: ')
-    pw=getpass('Password: ')
+    print(Style.BRIGHT+Fore.CYAN+'Password: '+Fore.RESET,end='')
+    pw=getpass('')
     try:
         moo.login(un,pw)
     except Exception as e:
@@ -260,6 +261,8 @@ def reuse_upload(repo_id):
     goto(2,0)
     fn=input(' Filename or Directory: ')
     if fn:
+        if fn[0]=='"' and fn[-1]=='"':
+            fn=fn[1:-1]
         if os.path.isfile(fn):
             upload([fn],repo_id)
         elif os.path.isdir(fn):

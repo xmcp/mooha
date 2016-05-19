@@ -3,6 +3,18 @@
 import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoderMonitor
 
+def fuck_urllib3_format_header_param(name, value):
+    # the original one is buggy for non-ascii filenames
+    # monkey patched
+    def trim(x):
+        for s in '"\\\r\n':
+            x=x.replace(s,'_')
+        return x
+    
+    return '%s="%s"'%(name, trim(value))
+
+requests.packages.urllib3.fields.format_header_param=fuck_urllib3_format_header_param
+
 from bs4 import BeautifulSoup
 import ast
 import datetime
@@ -11,6 +23,7 @@ class NoAttachment(Exception):
     __repr__=lambda:'该栏目没有附件'
 class LoginFailed(Exception):
     __repr__=lambda:'登录失败'
+
 
 class Mooha:
     base='http://moodle.rdfz.cn'
@@ -126,6 +139,8 @@ class Mooha:
         return res.json()
 
     def upload(self,articleid,filename,content,callback=lambda *_:None):
+        if not content:
+            raise RuntimeError('不能上传空文件')
         itemid=self._itemid(articleid)
         monitor=MultipartEncoderMonitor.from_fields(
             fields={
