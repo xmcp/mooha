@@ -6,7 +6,7 @@ if sys.platform == 'win32':
     base = 'Win32GUI'
 executables = [Executable(script='Mooha.pyw',
                base=base,
-               targetName="Mooha.exe",
+               targetName="[GUI]Mooha.exe",
                compress=True),
                Executable(script='MoohaCLI.py',
                base=None,
@@ -21,6 +21,7 @@ print('===== CLEANING UP =====')
 
 #os.remove('build/exe.win32-3.4/unicodedata.pyd')
 os.remove('build/exe.win32-3.4/_hashlib.pyd')
+os.remove('build/exe.win32-3.4/_ssl.pyd')
 shutil.rmtree('build/exe.win32-3.4/tcl/tzdata')
 shutil.rmtree('build/exe.win32-3.4/tcl/msgs')
 shutil.rmtree('build/exe.win32-3.4/tcl/encoding')

@@ -187,6 +187,7 @@ class Mooha:
         self._save(articleid,itemid,extra={'config_title':name})
     
     def repo_delete(self,articleid):
+        self._unlock()
         res=self.s.post(
             self.base+'/my/index.php',
             data={

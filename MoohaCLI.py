@@ -219,7 +219,7 @@ def login():
         return True
 
 def download(files,destination):
-    ui=ProgressUI('Download',[(file['filename'],file['size'],file['filesize']) for file in files])
+    ui=ProgressUI('Downloading',[(file['filename'],file['size'],file['filesize']) for file in files])
     for file in files:
         with open(os.path.join(destination,file['filename']),'wb') as f:
             for chunk in moo.download(file['url'],CHUNKSIZE):
@@ -228,6 +228,12 @@ def download(files,destination):
         ui.complete()
 
 def reuse_download_repo(repo_title,files):
+    if not files:
+        goto(2,0)
+        print(' The repository is empty.')
+        getch()
+        return
+
     prefered_path=os.path.join(homedir,repo_title)
     if os.path.isfile(prefered_path):
         prefered_path=homedir
@@ -248,7 +254,7 @@ def upload(fns,destination):
         ui.update(encoder.bytes_read-transfered)
         transfered=encoder.bytes_read
     
-    ui=ProgressUI('Upload',list(getstat()))
+    ui=ProgressUI('Uploading',list(getstat()))
     for fn in fns:
         with open(fn,'rb') as f:
             transfered=0
@@ -267,7 +273,7 @@ def reuse_upload(repo_id):
 
 def genitems(repos):
     for x in repos:
-        yield (x['title'],x['id'])
+        yield (x['title'],'#%s'%x['id'])
 def genfiles(files):
     for x in files:
         yield (x['filename'],x['filesize'])
@@ -284,11 +290,13 @@ def refresh_sub():
 def wp(key,txt): #wrap text
     return Back.RED+Style.BRIGHT+'['+key+']'+Style.RESET_ALL+Style.BRIGHT+' '+txt+' '
 
-print('Mooha CLI\n')
+cls()
+print(Fore.YELLOW+Style.BRIGHT+'   === Mooha: Moodle File Manager ===')
+print('          CLI Version by @xmcp\n')
 while True:
     if login():
         break
-print('Fetching repos...')
+print('Fetching repositories...')
 repos=list(moo.repos())
 
 ui_repos=ConsoleUI('>',
@@ -302,7 +310,7 @@ while True:
     if key==b'\x1b': #quit
         break
     
-    elif key==b'\r': #list files
+    elif key==b'\r' and repos: #list files
         cll(2,0)
         goto(2,0)
         print('Fetching files...')
@@ -319,6 +327,14 @@ while True:
             
             if key==b'\x1b': #quit
                 break
+
+            elif key==b' ' and files: #download
+                download([files[ind]],homedir)
+                os.startfile(homedir)
+
+            elif key==b'\r' and files: #download and open
+                download([files[ind]],homedir)
+                os.startfile(os.path.join(homedir,files[ind]['filename']))
             
             elif key==b'\t': #file options
                 cll(2,0)
@@ -326,7 +342,7 @@ while True:
                 print(' < '+wp('Space','Rename')+wp('X','Delete')+Style.RESET_ALL+'| '+wp('N','Upload')+wp('Enter','Download Repo'))
                 key=getch().decode(errors='replace').lower()
 
-                if key==' ': #rename
+                if key==' ' and files: #rename
                     cll(2,0)
                     goto(2,0)
                     new_name=input('Rename file to: ')
@@ -334,7 +350,7 @@ while True:
                         moo.rename(repo_id,files[ind]['filename'],new_name)
                         refresh_sub()
 
-                elif key=='x': #delete
+                elif key=='x' and files: #delete
                     cll(2,0)
                     goto(2,0)
                     print(' WARNING: "%s" will be deleted (y/n)'%files[ind]['filename'])
@@ -348,14 +364,9 @@ while True:
 
                 elif key=='\r': #download repo
                     reuse_download_repo(repo_title,files)
-            
-            elif key==b' ': #download
-                download([files[ind]],homedir)
-                os.startfile(homedir)
 
-            elif key==b'\r': #download and open
-                download([files[ind]],homedir)
-                os.startfile(os.path.join(homedir,files[ind]['filename']))
+    elif key==b' ' and repos: #upload
+        reuse_upload(repos[ind]['id'])
 
     elif key==b'\t': #repo options
         cll(2,0)
@@ -363,7 +374,7 @@ while True:
         print(' < '+wp('Space','Rename')+wp('Enter','Download Repo')+wp('X','Delete')+Style.RESET_ALL+'| '+wp('N','Create Repo'))
         key=getch().decode(errors='replace').lower()
 
-        if key==' ': #rename
+        if key==' ' and repos: #rename
             cll(2,0)
             goto(2,0)
             repo_name=input(' Rename repo to: ')
@@ -371,7 +382,7 @@ while True:
                 moo.repo_rename(repos[ind]['id'],repo_name)
                 refresh_main()
 
-        elif key=='x': #delete
+        elif key=='x' and repos: #delete
             cll(2,0)
             goto(2,0)
             print(' WARNING: "%s" will be deleted (y/n)'%repos[ind]['title'])
@@ -379,7 +390,7 @@ while True:
                 moo.repo_delete(repos[ind]['id'])
                 refresh_main()
 
-        elif key=='\r': #download repo
+        elif key=='\r' and repos: #download repo
             cll(2,0)
             goto(2,0)
             print(' Fetching files...')
@@ -406,9 +417,6 @@ while True:
                 else:
                     moo.inject_html(repo['id'])
             refresh_main()
-
-    elif key==b' ': #upload
-        reuse_upload(repos[ind]['id'])
 
 #normal quit
 cls()
