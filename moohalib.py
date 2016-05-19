@@ -31,6 +31,7 @@ class Mooha:
     
     def __init__(self):
         self.s=requests.Session()
+        s.proxies={'http':''}
 
     def login(self,username,password):
         res=self.s.post(
