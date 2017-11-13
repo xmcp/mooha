@@ -1,6 +1,7 @@
 #coding=utf-8
 
 import requests
+import re
 from requests_toolbelt.multipart.encoder import MultipartEncoderMonitor
 
 def fuck_urllib3_format_header_param(name, value):
@@ -20,9 +21,13 @@ import ast
 import datetime
 
 class NoAttachment(Exception):
-    __repr__=lambda:'该栏目没有附件'
+    __str__=__repr__=lambda:'该栏目没有附件'
 class LoginFailed(Exception):
-    __repr__=lambda:'登录失败'
+    def __init__(self,reason='登录失败'):
+        self.reason=reason
+    def __str__(self):
+        return self.reason
+    __repr__=__str__
 
 
 class Mooha:
@@ -31,32 +36,34 @@ class Mooha:
     
     def __init__(self):
         self.s=requests.Session()
-        s.proxies={'http':''}
+        self.s.proxies={'http':''}
 
     def login(self,username,password):
-        res=self.s.post(
-            self.base+'/login/index.php',
-            data={'username':username,'password':password},
-            allow_redirects=True,
-        )
-        if 'login' in res.url:
-            raise LoginFailed()
+        if username:
+            res=self.s.post(
+                self.base+'/login/index.php',
+                data={'username':username,'password':password},
+                allow_redirects=True,
+            )
+            if 'login' in res.url:
+                raise LoginFailed()
         else:
-            soup=BeautifulSoup(res.text,self.parser)
-            self.sesskey=soup.script\
-                .text.partition('sesskey')[2].partition(',')[0].split('"')[-2]
-            self.uid=soup.find('a',title='查看个人资料')\
-                .get('href').rpartition('id=')[2]
+            self.s.cookies.set('MoodleSession',password)
+            res=self.s.get(self.base+'/')
+            
+        soup=BeautifulSoup(res.text,self.parser)
+        self.sesskey=soup.find('script',text=re.compile(r'sesskey'))\
+            .text.partition('sesskey')[2].partition(',')[0].split('"')[-2]
+        self.uid=soup.find('a',attrs={'data-title':'profile,moodle'})\
+            .get('href').rpartition('id=')[2]
 
     def repos(self,cached=True):
         def _all_repos():
-            for x in soup.find_all('script')[-1].text.split('\n'):
-                if x.startswith('M.util.init_block_hider'):
+            for x in soup.find_all('h3',class_='card-title'):
+                if x.attrs['id'].startswith('instance-'):
                     yield {
-                        'id':x.partition('id":"inst')[2].partition('"')[0],
-                        'title':ast.literal_eval(
-                            '"%s"'%x.partition('title":"')[2].partition('"')[0]
-                        ),
+                        'id': x.attrs['id'].split('-')[1],
+                        'title': x.text
                     }
         
         res=self.s.get(self.base+'/my/index.php')
@@ -226,7 +233,7 @@ class Mooha:
         
         res=self.s.get(self.base+'/my/index.php')
         soup=BeautifulSoup(res.text,self.parser)
-        articleid=soup.find('span',text='Configure （新HTML版块） block')\
+        articleid=soup.find('span',text='配置 （新HTML版块） 版块')\
             .parent.attrs['href'].rpartition('=')[2]
         
         self._save(articleid,self._itemid(articleid),{'config_title':name})

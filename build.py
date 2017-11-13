@@ -15,12 +15,14 @@ executables = [Executable(script='Mooha.pyw',
 setup(name='Mooha',
       version='1.0',
       description='Moodle file manager',
-      executables=executables)
+      executables=executables,
+      options={'build_exe':{'optimize':2}},)
 
 print('===== CLEANING UP =====')
 
 #os.remove('build/exe.win32-3.4/unicodedata.pyd')
 os.remove('build/exe.win32-3.4/_hashlib.pyd')
+os.remove('build/exe.win32-3.4/_elementtree.pyd')
 os.remove('build/exe.win32-3.4/_ssl.pyd')
 shutil.rmtree('build/exe.win32-3.4/tcl/tzdata')
 shutil.rmtree('build/exe.win32-3.4/tcl/msgs')
